@@ -4,27 +4,21 @@ import com.rabbitmq.order_worker.entity.Order;
 import com.rabbitmq.order_worker.repository.OrderRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.json.JsonMapper;
 
 @Service
 public class OrderProcessor {
 
     private final OrderRepository orderRepository;
-    private final JsonMapper jsonMapper;
 
-    public OrderProcessor(
-            OrderRepository orderRepository,
-            JsonMapper jsonMapper) {
+    public OrderProcessor(OrderRepository orderRepository) {
 
         this.orderRepository = orderRepository;
-        this.jsonMapper = jsonMapper;
     }
 
     @Transactional
-    public void process(String orderJson) throws Exception {
+    public void process(Order order) {
 
-        System.out.println("Processing order: " + orderJson);
-        Order order = jsonMapper.readValue(orderJson, Order.class);
+        System.out.println("Processing order: " + order);
 
         if (orderRepository.existsById(order.getOrderId())) {
             System.out.println(
