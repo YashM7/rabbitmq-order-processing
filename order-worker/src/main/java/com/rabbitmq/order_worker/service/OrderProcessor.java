@@ -1,6 +1,7 @@
 package com.rabbitmq.order_worker.service;
 
 import com.rabbitmq.order_worker.entity.Order;
+import com.rabbitmq.order_worker.exception.InvalidOrderException;
 import com.rabbitmq.order_worker.repository.OrderRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,10 @@ public class OrderProcessor {
     public void process(Order order) {
 
         System.out.println("Processing order: " + order);
+
+        if(order.getOrderId() == null || order.getOrderId().isBlank()) {
+            throw new InvalidOrderException("Order ID is required");
+        }
 
         if (orderRepository.existsById(order.getOrderId())) {
             System.out.println(

@@ -2,6 +2,7 @@ package com.rabbitmq.order_worker.consumer;
 
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.order_worker.entity.Order;
+import com.rabbitmq.order_worker.exception.InvalidOrderException;
 import com.rabbitmq.order_worker.service.OrderProcessor;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.core.Message;
@@ -33,18 +34,16 @@ public class OrderConsumer {
 
         System.out.println("Received order: " + orderJson);
 
-        orderProcessor.process(order);
-
         long deliveryTag = message.getMessageProperties().getDeliveryTag();
 
-        channel.basicAck(deliveryTag, false);
+        try {
+            orderProcessor.process(order);
+            channel.basicAck(deliveryTag, false);
+            System.out.println("ACK sent for order: " + order.getOrderId());
 
-        System.out.println("ACK sent for order: " + order.getOrderId());
-
-//        channel.basicNack(
-//                message.getMessageProperties().getDeliveryTag(),
-//                false,
-//                false
-//        );
+        } catch (InvalidOrderException exception) {
+            System.out.println("Invalid order, sending to DLQ: " + exception.getMessage());
+            channel.basicNack(deliveryTag, false, false);
+        }
     }
 }
