@@ -18,6 +18,9 @@ public class RabbitMQConfig {
 
     public static final String ORDER_DLX = "order.dlx";
     public static final String ORDER_DLQ = "order.dlq";
+    public static final String ORDER_RETRY_QUEUE = "order.retry";
+    public static final String ORDER_RETRY_ROUTING_KEY = "order.retry";
+
 
     @Bean
     public DirectExchange orderExchange() {
@@ -34,6 +37,24 @@ public class RabbitMQConfig {
 
         return new Queue(
                 ORDER_QUEUE,
+                true,
+                false,
+                false,
+                arguments
+        );
+    }
+
+    @Bean
+    public Queue orderRetryQueue() {
+
+        Map<String, Object> arguments = new HashMap<>();
+
+        arguments.put("x-message-ttl", 5000);
+        arguments.put("x-dead-letter-exchange", ORDER_EXCHANGE);
+        arguments.put("x-dead-letter-routing-key", ORDER_ROUTING_KEY);
+
+        return new Queue(
+                ORDER_RETRY_QUEUE,
                 true,
                 false,
                 false,
@@ -65,6 +86,14 @@ public class RabbitMQConfig {
                 .bind(orderDeadLetterQueue)
                 .to(orderDeadLetterExchange)
                 .with("order.dlq");
+    }
+
+    @Bean
+    public Binding orderRetryBinding(Queue orderRetryQueue, DirectExchange orderExchange) {
+        return BindingBuilder
+                .bind(orderRetryQueue)
+                .to(orderExchange)
+                .with(ORDER_RETRY_ROUTING_KEY);
     }
 
     @Bean
