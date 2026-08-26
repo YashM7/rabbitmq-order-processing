@@ -25,6 +25,10 @@ public class OrderProcessor {
             throw new InvalidOrderException("Order ID is required");
         }
 
+        if (order.getQuantity() <= 0) {
+            throw new InvalidOrderException("Quantity must be greater than zero");
+        }
+
         if (orderRepository.existsById(order.getOrderId())) {
             System.out.println(
                     "Order already exists, skipping: " + order.getOrderId()

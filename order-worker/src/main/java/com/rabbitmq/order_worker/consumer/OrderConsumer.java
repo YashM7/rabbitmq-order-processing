@@ -2,7 +2,8 @@ package com.rabbitmq.order_worker.consumer;
 
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.order_worker.entity.Order;
-import com.rabbitmq.order_worker.exception.InvalidOrderException;
+import com.rabbitmq.order_worker.exception.PermanentOrderException;
+import com.rabbitmq.order_worker.exception.TransientOrderException;
 import com.rabbitmq.order_worker.service.OrderProcessor;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.core.Message;
@@ -20,6 +21,7 @@ import static com.rabbitmq.order_worker.config.RabbitMQConfig.*;
 public class OrderConsumer {
 
     private static final long MAX_RETRIES = 3;
+    public static final String ORDER_QUEUE = "order.queue";
     private final OrderProcessor orderProcessor;
     private final JsonMapper jsonMapper;
     private final RabbitTemplate rabbitTemplate;
@@ -66,7 +68,7 @@ public class OrderConsumer {
         return 0;
     }
 
-    @RabbitListener(queues = "order.queue")
+    @RabbitListener(queues = ORDER_QUEUE)
     public void consumeOrder(Message message, Channel channel) throws Exception {
 
         String orderJson = new String(
@@ -74,7 +76,16 @@ public class OrderConsumer {
                 StandardCharsets.UTF_8
         );
 
-        Order order = jsonMapper.readValue(orderJson, Order.class);
+        long deliveryTag = message.getMessageProperties().getDeliveryTag();
+        Order order;
+
+        try {
+            order = jsonMapper.readValue(orderJson, Order.class);
+        } catch (Exception e) {
+            System.out.println("Malformed order message: " + e.getMessage());
+            channel.basicNack(deliveryTag, false, false);
+            return;
+        }
 
         System.out.println("Received order: " + orderJson);
 
@@ -82,18 +93,16 @@ public class OrderConsumer {
 
         System.out.println("Retry count: " + getRetryCount(message));
 
-        long deliveryTag = message.getMessageProperties().getDeliveryTag();
-
         try {
             orderProcessor.process(order);
             channel.basicAck(deliveryTag, false);
             System.out.println("ACK sent for order: " + order.getOrderId());
 
-        } catch (InvalidOrderException exception) {
+        } catch (PermanentOrderException exception) {
             System.out.println("Permanent failure. Sent to DLQ: " + exception.getMessage());
             channel.basicNack(deliveryTag, false, false);
 
-        } catch (Exception exception) {
+        } catch (TransientOrderException exception) {
 
             long retryCount = getRetryCount(message);
 
@@ -120,14 +129,7 @@ public class OrderConsumer {
             } else {
 
                 System.out.println("Maximum retries reached. Sending to DLQ: " + order.getOrderId());
-
-                rabbitTemplate.send(
-                        ORDER_DLX,
-                        ORDER_DLQ,
-                        message
-                );
-
-                channel.basicAck(deliveryTag, false);
+                channel.basicNack(deliveryTag, false, false);
                 System.out.println("Message sent to DLQ");
             }
         }
