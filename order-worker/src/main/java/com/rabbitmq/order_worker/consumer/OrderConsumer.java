@@ -20,10 +20,12 @@ import static com.rabbitmq.order_worker.config.RabbitMQConfig.*;
 @Component
 public class OrderConsumer {
 
-    private static final long MAX_RETRIES = 3;
+    private static final long MAX_RETRIES = 5;
     private final OrderProcessor orderProcessor;
     private final JsonMapper jsonMapper;
     private final RabbitTemplate rabbitTemplate;
+    private static final long BASE_DELAY_MS = 5000;
+    private static final long MAX_DELAY_MS = 30000;
 
     public OrderConsumer(
             OrderProcessor orderProcessor,
@@ -67,6 +69,11 @@ public class OrderConsumer {
         return 0;
     }
 
+    private long calculateBackoffDelay(long retryCount) {
+        long delay = (long) (BASE_DELAY_MS * Math.pow(2, retryCount));
+        return Math.min(delay, MAX_DELAY_MS);
+    }
+
     private void handleRetryableFailure(
             String reason,
             Message message,
@@ -77,8 +84,13 @@ public class OrderConsumer {
         long retryCount = getRetryCount(message);
 
         if (retryCount < MAX_RETRIES) {
+
+            long delay = calculateBackoffDelay(retryCount);
             System.out.println(reason + ". Retry " + (retryCount + 1) + " of " + MAX_RETRIES
-                    + ": " + order.getOrderId());
+                    + " for " + order.getOrderId() + " - delay " + delay + "ms");
+
+            message.getMessageProperties().setExpiration(String.valueOf(delay));
+
             rabbitTemplate.send(ORDER_EXCHANGE, ORDER_RETRY_ROUTING_KEY, message);
             channel.basicAck(deliveryTag, false);
         } else {

@@ -49,7 +49,6 @@ public class RabbitMQConfig {
 
         Map<String, Object> arguments = new HashMap<>();
 
-        arguments.put("x-message-ttl", 5000);
         arguments.put("x-dead-letter-exchange", ORDER_EXCHANGE);
         arguments.put("x-dead-letter-routing-key", ORDER_ROUTING_KEY);
 
