@@ -2,7 +2,11 @@ package com.rabbitmq.order_worker.service;
 
 import com.rabbitmq.order_worker.entity.Order;
 import com.rabbitmq.order_worker.exception.InvalidOrderException;
+import com.rabbitmq.order_worker.exception.PermanentOrderException;
+import com.rabbitmq.order_worker.exception.TransientOrderException;
 import com.rabbitmq.order_worker.repository.OrderRepository;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,16 +33,22 @@ public class OrderProcessor {
             throw new InvalidOrderException("Quantity must be greater than zero");
         }
 
-        if (orderRepository.existsById(order.getOrderId())) {
-            System.out.println(
-                    "Order already exists, skipping: " + order.getOrderId()
-            );
-            return;
-        }
+        try {
+            if (orderRepository.existsById(order.getOrderId())) {
+                System.out.println("Order already exists, skipping: " + order.getOrderId());
+                return;
+            }
 
-        orderRepository.save(order);
-        System.out.println(
-                "Order saved to database: " + order.getOrderId()
-        );
+            orderRepository.save(order);
+            System.out.println("Order saved to database: " + order.getOrderId());
+
+        } catch (DataIntegrityViolationException e) {
+            throw new PermanentOrderException("Data integrity violation for order " + order.getOrderId(), e);
+        } catch (DataAccessException e) {
+            throw new TransientOrderException(
+                    "Transient DB failure for order " + order.getOrderId(),
+                    e
+            );
+        }
     }
 }

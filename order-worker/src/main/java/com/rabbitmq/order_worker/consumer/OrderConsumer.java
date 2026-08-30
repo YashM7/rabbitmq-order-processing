@@ -21,7 +21,6 @@ import static com.rabbitmq.order_worker.config.RabbitMQConfig.*;
 public class OrderConsumer {
 
     private static final long MAX_RETRIES = 3;
-    public static final String ORDER_QUEUE = "order.queue";
     private final OrderProcessor orderProcessor;
     private final JsonMapper jsonMapper;
     private final RabbitTemplate rabbitTemplate;
@@ -68,6 +67,26 @@ public class OrderConsumer {
         return 0;
     }
 
+    private void handleRetryableFailure(
+            String reason,
+            Message message,
+            Channel channel,
+            long deliveryTag,
+            Order order) throws Exception {
+
+        long retryCount = getRetryCount(message);
+
+        if (retryCount < MAX_RETRIES) {
+            System.out.println(reason + ". Retry " + (retryCount + 1) + " of " + MAX_RETRIES
+                    + ": " + order.getOrderId());
+            rabbitTemplate.send(ORDER_EXCHANGE, ORDER_RETRY_ROUTING_KEY, message);
+            channel.basicAck(deliveryTag, false);
+        } else {
+            System.out.println("Max retries reached. Sending to DLQ: " + order.getOrderId());
+            channel.basicNack(deliveryTag, false, false);
+        }
+    }
+
     @RabbitListener(queues = ORDER_QUEUE)
     public void consumeOrder(Message message, Channel channel) throws Exception {
 
@@ -103,35 +122,10 @@ public class OrderConsumer {
             channel.basicNack(deliveryTag, false, false);
 
         } catch (TransientOrderException exception) {
-
-            long retryCount = getRetryCount(message);
-
-            if (retryCount < MAX_RETRIES) {
-
-                System.out.println(
-                        "Transient failure. Retry "
-                                + (retryCount + 1)
-                                + " of "
-                                + MAX_RETRIES
-                                + ": "
-                                + order.getOrderId()
-                );
-
-                rabbitTemplate.send(
-                        ORDER_EXCHANGE,
-                        ORDER_RETRY_ROUTING_KEY,
-                        message
-                );
-
-                channel.basicAck(deliveryTag, false);
-                System.out.println("Message sent to retry queue");
-
-            } else {
-
-                System.out.println("Maximum retries reached. Sending to DLQ: " + order.getOrderId());
-                channel.basicNack(deliveryTag, false, false);
-                System.out.println("Message sent to DLQ");
-            }
+            handleRetryableFailure("Transient failure", message, channel, deliveryTag, order);
+        }
+        catch (Exception exception) {
+            handleRetryableFailure("Unclassified failure (" + exception.getMessage() + ")", message, channel, deliveryTag, order);
         }
     }
 }
