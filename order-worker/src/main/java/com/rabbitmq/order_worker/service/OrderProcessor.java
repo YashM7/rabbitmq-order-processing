@@ -1,6 +1,7 @@
 package com.rabbitmq.order_worker.service;
 
 import com.rabbitmq.order_worker.entity.Order;
+import com.rabbitmq.order_worker.entity.OrderStatus;
 import com.rabbitmq.order_worker.exception.InvalidOrderException;
 import com.rabbitmq.order_worker.exception.PermanentOrderException;
 import com.rabbitmq.order_worker.exception.TransientOrderException;
@@ -33,12 +34,17 @@ public class OrderProcessor {
             throw new InvalidOrderException("Quantity must be greater than zero");
         }
 
+        if(order.getProduct() == null || order.getProduct().isBlank()) {
+            throw new InvalidOrderException("Product is required");
+        }
+
         try {
             if (orderRepository.existsById(order.getOrderId())) {
                 System.out.println("Order already exists, skipping: " + order.getOrderId());
                 return;
             }
 
+            order.setStatus(OrderStatus.COMPLETED);
             orderRepository.save(order);
             System.out.println("Order saved to database: " + order.getOrderId());
 

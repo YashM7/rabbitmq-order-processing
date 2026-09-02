@@ -1,8 +1,10 @@
 package com.rabbitmq.order_worker.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.Instant;
 
 @Entity
 @Table(name = "orders")
@@ -14,6 +16,15 @@ public class Order {
     private String product;
 
     private int quantity;
+
+    @Enumerated(EnumType.STRING)
+    private OrderStatus status;
+
+    @CreationTimestamp
+    private Instant createdAt;
+
+    @UpdateTimestamp
+    private Instant updatedAt;
 
     public Order() {
     }
@@ -48,12 +59,31 @@ public class Order {
         this.quantity = quantity;
     }
 
+    public OrderStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(OrderStatus status) {
+        this.status = status;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
     @Override
     public String toString() {
         return "Order{" +
                 "orderId='" + orderId + '\'' +
                 ", product='" + product + '\'' +
                 ", quantity=" + quantity +
+                ", status=" + status +
+                ", createdAt=" + createdAt +
+                ", updatedAt=" + updatedAt +
                 '}';
     }
 }

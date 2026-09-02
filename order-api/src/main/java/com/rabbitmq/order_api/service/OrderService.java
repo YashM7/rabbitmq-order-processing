@@ -1,5 +1,6 @@
 package com.rabbitmq.order_api.service;
 
+import com.rabbitmq.order_api.DTO.OrderRequest;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
@@ -15,7 +16,7 @@ public class OrderService {
         this.rabbitTemplate = rabbitTemplate;
     }
 
-    public void createOrder(String order) {
+    public void createOrder(OrderRequest order) {
         rabbitTemplate.convertAndSend(
                 ORDER_EXCHANGE,
                 ORDER_ROUTING_KEY,
