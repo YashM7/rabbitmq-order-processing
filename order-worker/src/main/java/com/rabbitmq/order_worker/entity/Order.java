@@ -3,12 +3,14 @@ package com.rabbitmq.order_worker.entity;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
+import org.springframework.data.domain.Persistable;
 
 import java.time.Instant;
 
 @Entity
 @Table(name = "orders")
-public class Order {
+public class Order implements Persistable<String > {
 
     @Id
     private String orderId;
@@ -33,6 +35,16 @@ public class Order {
         this.orderId = orderId;
         this.product = product;
         this.quantity = quantity;
+    }
+
+    @Override
+    public @Nullable String getId() {
+        return orderId;
+    }
+
+    @Override
+    public boolean isNew() {
+        return createdAt == null;
     }
 
     public String getOrderId() {

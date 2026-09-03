@@ -2,6 +2,7 @@ package com.rabbitmq.order_worker.consumer;
 
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.order_worker.entity.Order;
+import com.rabbitmq.order_worker.exception.DuplicateOrderException;
 import com.rabbitmq.order_worker.exception.PermanentOrderException;
 import com.rabbitmq.order_worker.exception.TransientOrderException;
 import com.rabbitmq.order_worker.service.OrderProcessor;
@@ -129,14 +130,18 @@ public class OrderConsumer {
             channel.basicAck(deliveryTag, false);
             System.out.println("ACK sent for order: " + order.getOrderId());
 
+        } catch (DuplicateOrderException exception) {
+            channel.basicAck(deliveryTag, false);
+            System.out.println("Duplicate detected, already processed elsewhere — acking without action. " + exception.getMessage());
+
         } catch (PermanentOrderException exception) {
             System.out.println("Permanent failure. Sent to DLQ: " + exception.getMessage());
             channel.basicNack(deliveryTag, false, false);
 
         } catch (TransientOrderException exception) {
             handleRetryableFailure("Transient failure", message, channel, deliveryTag, order);
-        }
-        catch (Exception exception) {
+
+        } catch (Exception exception) {
             handleRetryableFailure("Unclassified failure (" + exception.getMessage() + ")", message, channel, deliveryTag, order);
         }
     }

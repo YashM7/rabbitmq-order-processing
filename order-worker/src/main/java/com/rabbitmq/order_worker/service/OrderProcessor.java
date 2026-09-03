@@ -2,6 +2,7 @@ package com.rabbitmq.order_worker.service;
 
 import com.rabbitmq.order_worker.entity.Order;
 import com.rabbitmq.order_worker.entity.OrderStatus;
+import com.rabbitmq.order_worker.exception.DuplicateOrderException;
 import com.rabbitmq.order_worker.exception.InvalidOrderException;
 import com.rabbitmq.order_worker.exception.PermanentOrderException;
 import com.rabbitmq.order_worker.exception.TransientOrderException;
@@ -45,11 +46,21 @@ public class OrderProcessor {
             }
 
             order.setStatus(OrderStatus.COMPLETED);
-            orderRepository.save(order);
+            orderRepository.saveAndFlush(order);
             System.out.println("Order saved to database: " + order.getOrderId());
 
         } catch (DataIntegrityViolationException e) {
+            Throwable cause = e.getCause();
+
+            if(cause instanceof org.hibernate.exception.ConstraintViolationException constraintViolation
+                && "orders_pkey".equals(constraintViolation.getConstraintName())) {
+
+                throw new DuplicateOrderException(
+                        "Duplicate order detected (race condition) for " + order.getOrderId(), e);
+            }
+
             throw new PermanentOrderException("Data integrity violation for order " + order.getOrderId(), e);
+
         } catch (DataAccessException e) {
             throw new TransientOrderException(
                     "Transient DB failure for order " + order.getOrderId(),
