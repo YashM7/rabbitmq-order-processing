@@ -68,4 +68,40 @@ public class OrderProcessor {
             );
         }
     }
+
+    public void processWithUpsert(Order order) {
+
+        System.out.println("Processing order: " + order);
+
+        if (order.getOrderId() == null || order.getOrderId().isBlank()) {
+            throw new InvalidOrderException("Order ID is required");
+        }
+
+        if (order.getQuantity() <= 0) {
+            throw new InvalidOrderException("Quantity must be greater than zero");
+        }
+
+        if (order.getProduct() == null || order.getProduct().isBlank()) {
+            throw new InvalidOrderException("Product is required");
+        }
+
+        try {
+            int rowsAffected = orderRepository.insertIfNotExists(
+                    order.getOrderId(),
+                    order.getProduct(),
+                    order.getQuantity(),
+                    OrderStatus.COMPLETED.name()
+            );
+
+            if (rowsAffected == 1) {
+                System.out.println("Order inserted: " + order.getOrderId());
+            } else {
+                System.out.println("Order already exists, skipped (ON CONFLICT): " + order.getOrderId());
+            }
+
+        } catch (DataAccessException e) {
+            throw new TransientOrderException(
+                    "Transient DB failure for order " + order.getOrderId(), e);
+        }
+    }
 }

@@ -126,7 +126,7 @@ public class OrderConsumer {
         System.out.println("Retry count: " + getRetryCount(message));
 
         try {
-            orderProcessor.process(order);
+            orderProcessor.processWithUpsert(order);
             channel.basicAck(deliveryTag, false);
             System.out.println("ACK sent for order: " + order.getOrderId());
 
