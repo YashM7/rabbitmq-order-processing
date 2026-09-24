@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p ${PID:- } --- [%15.15t] %-40.40logger{39} : %m%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="CONSOLE_WITH_CONTEXT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p ${PID:- } --- [%15.15t] %-40.40logger{39} : orderId=%X{orderId} retry=%X{retryCount} redelivered=%X{redelivered} - %m%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="com.rabbitmq.order_worker.consumer" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE_WITH_CONTEXT"/>
+    </logger>
+
+    <logger name="com.rabbitmq.order_worker.service" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE_WITH_CONTEXT"/>
+    </logger>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>

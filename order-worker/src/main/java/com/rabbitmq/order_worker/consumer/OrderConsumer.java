@@ -6,6 +6,9 @@ import com.rabbitmq.order_worker.exception.DuplicateOrderException;
 import com.rabbitmq.order_worker.exception.PermanentOrderException;
 import com.rabbitmq.order_worker.exception.TransientOrderException;
 import com.rabbitmq.order_worker.service.OrderProcessor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -27,6 +30,7 @@ public class OrderConsumer {
     private final RabbitTemplate rabbitTemplate;
     private static final long BASE_DELAY_MS = 5000;
     private static final long MAX_DELAY_MS = 30000;
+    private static final Logger log = LoggerFactory.getLogger(OrderConsumer.class);
 
     public OrderConsumer(
             OrderProcessor orderProcessor,
@@ -77,6 +81,7 @@ public class OrderConsumer {
 
     private void handleRetryableFailure(
             String reason,
+            boolean isUnanticipated,
             Message message,
             Channel channel,
             long deliveryTag,
@@ -90,12 +95,27 @@ public class OrderConsumer {
             System.out.println(reason + ". Retry " + (retryCount + 1) + " of " + MAX_RETRIES
                     + " for " + order.getOrderId() + " - delay " + delay + "ms");
 
+            String logMessage = reason + ". Retry " + (retryCount + 1) + " of " + MAX_RETRIES
+                    + " for " + order.getOrderId() + " - delay " + delay + "ms";
+
+            if (isUnanticipated) {
+                log.error(logMessage);
+            } else {
+                log.warn(logMessage);
+            }
+
             message.getMessageProperties().setExpiration(String.valueOf(delay));
 
             rabbitTemplate.send(ORDER_EXCHANGE, ORDER_RETRY_ROUTING_KEY, message);
             channel.basicAck(deliveryTag, false);
         } else {
             System.out.println("Max retries reached. Sending to DLQ: " + order.getOrderId());
+            String dlqMessage = "Max retries reached. Sending to DLQ: " + order.getOrderId();
+            if (isUnanticipated) {
+                log.error(dlqMessage);
+            } else {
+                log.warn(dlqMessage);
+            }
             channel.basicNack(deliveryTag, false, false);
         }
     }
@@ -114,35 +134,46 @@ public class OrderConsumer {
         try {
             order = jsonMapper.readValue(orderJson, Order.class);
         } catch (Exception e) {
-            System.out.println("Malformed order message: " + e.getMessage());
+            log.warn("Malformed order message: " + e.getMessage());
             channel.basicNack(deliveryTag, false, false);
             return;
         }
 
-        System.out.println("Received order: " + orderJson);
+        MDC.put("orderId", order.getOrderId());
+        MDC.put("retryCount", String.valueOf(getRetryCount(message)));
+        MDC.put("redelivered", String.valueOf(message.getMessageProperties().isRedelivered()));
 
-        System.out.println("Message headers: " + message.getMessageProperties().getHeaders());
+        log.info("Received order: " + orderJson);
 
-        System.out.println("Retry count: " + getRetryCount(message));
+        log.info("Message headers: " + message.getMessageProperties().getHeaders());
+
+        log.info("Retry count: " + getRetryCount(message));
 
         try {
-            orderProcessor.processWithUpsert(order);
-            channel.basicAck(deliveryTag, false);
-            System.out.println("ACK sent for order: " + order.getOrderId());
+            log.info("Received order: " + orderJson);
 
-        } catch (DuplicateOrderException exception) {
-            channel.basicAck(deliveryTag, false);
-            System.out.println("Duplicate detected, already processed elsewhere — acking without action. " + exception.getMessage());
+            try {
+                orderProcessor.processWithUpsert(order);
+                channel.basicAck(deliveryTag, false);
+                log.info("ACK sent for order: " + order.getOrderId());
 
-        } catch (PermanentOrderException exception) {
-            System.out.println("Permanent failure. Sent to DLQ: " + exception.getMessage());
-            channel.basicNack(deliveryTag, false, false);
+            } catch (DuplicateOrderException exception) {
+                channel.basicAck(deliveryTag, false);
+                log.warn("Duplicate detected, already processed elsewhere — acking without action. " + exception.getMessage());
 
-        } catch (TransientOrderException exception) {
-            handleRetryableFailure("Transient failure", message, channel, deliveryTag, order);
+            } catch (PermanentOrderException exception) {
+                log.warn("Permanent failure. Sent to DLQ: " + exception.getMessage());
+                channel.basicNack(deliveryTag, false, false);
 
-        } catch (Exception exception) {
-            handleRetryableFailure("Unclassified failure (" + exception.getMessage() + ")", message, channel, deliveryTag, order);
+            } catch (TransientOrderException exception) {
+                handleRetryableFailure("Transient failure", false, message, channel, deliveryTag, order);
+
+            } catch (Exception exception) {
+                handleRetryableFailure("Unclassified failure (" + exception.getMessage() + ")", true, message, channel, deliveryTag, order);
+            }
+        } finally {
+            MDC.clear();
         }
+
     }
 }
