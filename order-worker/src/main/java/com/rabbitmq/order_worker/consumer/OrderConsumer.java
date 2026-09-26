@@ -123,6 +123,10 @@ public class OrderConsumer {
     @RabbitListener(queues = ORDER_QUEUE)
     public void consumeOrder(Message message, Channel channel) throws Exception {
 
+        Object traceIdHeader = message.getMessageProperties().getHeaders().get("traceId");
+        String traceId = traceIdHeader != null ? traceIdHeader.toString() : "no-trace-id";
+        MDC.put("traceId", traceId);
+
         String orderJson = new String(
                 message.getBody(),
                 StandardCharsets.UTF_8
