@@ -1,0 +1,28 @@
+name: order-api CI Pipeline
+
+on:
+  push:
+    paths:
+      - 'order-api/**'
+  pull_request:
+    paths:
+      - 'order-api/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build with Maven
+        working-directory: ./order-api
+        run: ./mvnw clean verify
