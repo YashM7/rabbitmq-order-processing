@@ -154,7 +154,6 @@ public class OrderConsumer {
         log.info("Retry count: " + getRetryCount(message));
 
         try {
-            log.info("Received order: " + orderJson);
 
             try {
                 orderProcessor.processWithUpsert(order);

@@ -1,0 +1,99 @@
+{
+  "users": [
+    {
+      "name": "admin",
+      "password_hash": "bY08vjROtkP8YJ/rKKBSclX2xpbGghyyXLJKrA0d8fO0PsN/",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": ["administrator"]
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "admin",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "queues": [
+    {
+      "name": "order.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "order.queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "order.dlx",
+        "x-dead-letter-routing-key": "order.dlq"
+      }
+    },
+    {
+      "name": "order.retry",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "order.exchange",
+        "x-dead-letter-routing-key": "order.created"
+      }
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "order.exchange",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "order.dlx",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "order.dlx",
+      "vhost": "/",
+      "destination": "order.dlq",
+      "destination_type": "queue",
+      "routing_key": "order.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "order.exchange",
+      "vhost": "/",
+      "destination": "order.queue",
+      "destination_type": "queue",
+      "routing_key": "order.created",
+      "arguments": {}
+    },
+    {
+      "source": "order.exchange",
+      "vhost": "/",
+      "destination": "order.retry",
+      "destination_type": "queue",
+      "routing_key": "order.retry",
+      "arguments": {}
+    }
+  ]
+}
