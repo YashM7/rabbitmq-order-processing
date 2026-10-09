@@ -1,0 +1,29 @@
+name: order-worker CI Pipeline
+
+on:
+  push:
+    paths:
+      - 'order-worker/**'
+  pull_request:
+    paths:
+      - 'order-worker/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: ./order-worker/pom.xml
+
+      - name: Build with Maven
+        working-directory: ./order-worker
+        run: ./mvnw clean verify

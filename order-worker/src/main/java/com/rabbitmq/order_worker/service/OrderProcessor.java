@@ -83,6 +83,10 @@ public class OrderProcessor {
 
             log.info("Processing order: " + order);
 
+            if (order == null) {
+                throw new InvalidOrderException("Order is required");
+            }
+
             if (order.getOrderId() == null || order.getOrderId().isBlank()) {
                 throw new InvalidOrderException("Order ID is required");
             }
