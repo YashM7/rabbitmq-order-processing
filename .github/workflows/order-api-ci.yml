@@ -22,6 +22,7 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+          cache-dependency-path: ./order-api/pom.xml
 
       - name: Build with Maven
         working-directory: ./order-api
